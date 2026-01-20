@@ -37,8 +37,8 @@ def create_pdf(results, filename="availability.pdf"):
     pdf.set_font("helvetica", size=10)
     
     # Table Header
-    headers = ["Data", "Pineta", "Góriz (Ref)", "Góriz (Acam)", "Espuguettes", "Bayssellance", "Serradets"]
-    col_widths = [25, 20, 25, 25, 25, 25, 25]
+    headers = ["Data", "Serradets", "Góriz(Ref)", "Góriz(Ac)", "Pineta", "Espuguettes", "Grange", "Bayss."]
+    col_widths = [22, 18, 20, 20, 18, 25, 18, 18]
     
     pdf.set_fill_color(200, 220, 255)
     pdf.set_font("helvetica", 'B', 8) # Smaller font for headers
@@ -52,7 +52,7 @@ def create_pdf(results, filename="availability.pdf"):
     pdf.set_fill_color(255, 255, 255)
     
     for row in results:
-        # row structure from main: [d_str, pineta, goriz_ref, goriz_camp, esp, bay, ser]
+        # row structure from main: [d_str, ser, goriz_ref, goriz_camp, pineta, esp, gra, bay]
         for i, item in enumerate(row):
             text = str(item)
             pdf.cell(col_widths[i], 10, text, border=1, align='C')
@@ -228,6 +228,44 @@ def get_serradets():
         print(f"Error fetching Serradets: {e}")
         return {}
 
+def get_grange():
+    print("Fetching Grange de Holle...")
+    url = 'https://centrale.ffcam.fr/index.php?'
+    
+    headers = HEADERS.copy()
+    headers.update({
+        'origin': 'https://centrale.ffcam.fr',
+        'referer': 'https://centrale.ffcam.fr/index.php?structure=BK_STRUCTURE%3A116&mode=FORM&_lang=FR',
+        'content-type': 'application/x-www-form-urlencoded'
+    })
+    
+    data_payload = {
+        'action': 'availability',
+        'structure': 'BK_STRUCTURE:116',
+        'productCategory': 'nomatter', # From curl
+        'pax': '8'
+    }
+    
+    try:
+        resp = requests.post(url, headers=headers, data=data_payload)
+        text = resp.text
+        
+        match = re.search(r'BK\.availability\s*=\s*({.*?});', text, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+            try:
+                data = json.loads(json_str)
+                return data
+            except json.JSONDecodeError:
+                print("Grange returned valid JS but invalid JSON")
+                return {}
+        else:
+            print("Could not find BK.availability in Grange response")
+            return {}
+    except Exception as e:
+        print(f"Error fetching Grange: {e}")
+        return {}
+
 def get_bujaruelo(target_date):
     # Bujaruelo API seems to return data for the requested range.
     d_str = target_date.strftime('%Y-%m-%d')
@@ -274,6 +312,7 @@ def main():
     # espuguettes_data = get_espuguettes() # We will fetch per day now
     bayssellance_data = get_bayssellance()
     serradets_data = get_serradets()
+    grange_data = get_grange()
     
     dates = list(get_date_range())
     
@@ -282,9 +321,11 @@ def main():
 
     print("\nProcessant dates...")
     
+    # Order: Serradets, Goriz, Pineta, Espuguettes, Grange, Bayssellance
+    
     output_md = "# Informe de Disponibilitat\n\n"
-    output_md += "| Data | Pineta | Góriz (Refugi) | Góriz (Acampada) | Espuguettes | Bayssellance | Serradets |\n"
-    output_md += "|------|--------|----------------|------------------|-------------|--------------|-----------|\n"
+    output_md += "| Data | Serradets | Góriz (Refugi) | Góriz (Acampada) | Pineta | Espuguettes | Grange | Bayssellance |\n"
+    output_md += "|------|-----------|----------------|------------------|--------|-------------|--------|--------------|\n"
     
     for d in dates:
         d_str = format_date(d)
@@ -309,10 +350,14 @@ def main():
         ser = serradets_data.get(d_str, "N/A")
         if ser is None: ser = "Sense Info"
         
-        # Collect for PDF
-        results.append([d_str, pineta, goriz_ref, goriz_camp, esp, bay, ser])
+        # Grange
+        gra = grange_data.get(d_str, "N/A")
+        if gra is None: gra = "Sense Info"
         
-        row = f"| {d_str} | {pineta} | {goriz_ref} | {goriz_camp} | {esp} | {bay} | {ser} |"
+        # Collect for PDF: [d_str, ser, goriz_ref, goriz_camp, pineta, esp, gra, bay]
+        results.append([d_str, ser, goriz_ref, goriz_camp, pineta, esp, gra, bay])
+        
+        row = f"| {d_str} | {ser} | {goriz_ref} | {goriz_camp} | {pineta} | {esp} | {gra} | {bay} |"
         output_md += row + "\n"
         print(f"Processat {d_str}")
 
