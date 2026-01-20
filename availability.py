@@ -239,11 +239,13 @@ def get_grange():
         'content-type': 'application/x-www-form-urlencoded'
     })
     
+    # Passing the start date to ensure we get the relevant window of availability
     data_payload = {
         'action': 'availability',
         'structure': 'BK_STRUCTURE:116',
-        'productCategory': 'nomatter', # From curl
-        'pax': '8'
+        'productCategory': 'nomatter', 
+        'pax': '8',
+        'date': START_DATE.strftime('%Y-%m-%d')
     }
     
     try:
@@ -255,6 +257,8 @@ def get_grange():
             json_str = match.group(1)
             try:
                 data = json.loads(json_str)
+                # Debug: print first few keys to see what we got if needed
+                # print(f"Grange keys: {list(data.keys())[:5]}")
                 return data
             except json.JSONDecodeError:
                 print("Grange returned valid JS but invalid JSON")
