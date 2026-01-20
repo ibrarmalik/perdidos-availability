@@ -37,7 +37,7 @@ def create_pdf(results, filename="availability.pdf"):
     pdf.set_font("helvetica", size=10)
     
     # Table Header
-    headers = ["Data", "Serradets", "Góriz(Ref)", "Góriz(Ac)", "Pineta", "Espuguettes", "Grange", "Bayss."]
+    headers = ["Data", "Sarradets", "Góriz(Ref)", "Góriz(Ac)", "Pineta", "Espuguettes", "Grange", "Bayss."]
     col_widths = [22, 18, 20, 20, 18, 25, 18, 18]
     
     pdf.set_fill_color(200, 220, 255)
@@ -190,8 +190,8 @@ def get_bayssellance():
         print(f"Error fetching Bayssellance: {e}")
         return {}
 
-def get_serradets():
-    print("Fetching Serradets (Brèche de Roland)...")
+def get_sarradets():
+    print("Fetching Sarradets (Brèche de Roland)...")
     url = 'https://centrale.ffcam.fr/index.php?'
     
     headers = HEADERS.copy()
@@ -201,11 +201,16 @@ def get_serradets():
         'content-type': 'application/x-www-form-urlencoded'
     })
     
+    # We might need to fetch multiple months if the range spans across months
+    # or if the initial fetch doesn't cover everything.
+    # Let's try to fetch once with the START_DATE, similar to Grange.
+    
     data_payload = {
         'action': 'availability',
         'structure': 'BK_STRUCTURE:112',
         'productCategory': 'BK_PRODUCTCATEGORY:NUITEE',
-        'pax': '8'
+        'pax': '8',
+        'date': START_DATE.strftime('%Y-%m-%d')
     }
     
     try:
@@ -219,13 +224,13 @@ def get_serradets():
                 data = json.loads(json_str)
                 return data
             except json.JSONDecodeError:
-                print("Serradets returned valid JS but invalid JSON")
+                print("Sarradets returned valid JS but invalid JSON")
                 return {}
         else:
-            print("Could not find BK.availability in Serradets response")
+            print("Could not find BK.availability in Sarradets response")
             return {}
     except Exception as e:
-        print(f"Error fetching Serradets: {e}")
+        print(f"Error fetching Sarradets: {e}")
         return {}
 
 def get_grange():
@@ -315,7 +320,7 @@ def main():
     goriz_data = get_goriz()
     # espuguettes_data = get_espuguettes() # We will fetch per day now
     bayssellance_data = get_bayssellance()
-    serradets_data = get_serradets()
+    sarradets_data = get_sarradets()
     grange_data = get_grange()
     
     dates = list(get_date_range())
@@ -325,10 +330,10 @@ def main():
 
     print("\nProcessant dates...")
     
-    # Order: Serradets, Goriz, Pineta, Espuguettes, Grange, Bayssellance
+    # Order: Sarradets, Goriz, Pineta, Espuguettes, Grange, Bayssellance
     
     output_md = "# Informe de Disponibilitat\n\n"
-    output_md += "| Data | Serradets | Góriz (Refugi) | Góriz (Acampada) | Pineta | Espuguettes | Grange | Bayssellance |\n"
+    output_md += "| Data | Sarradets | Góriz (Refugi) | Góriz (Acampada) | Pineta | Espuguettes | Grange | Bayssellance |\n"
     output_md += "|------|-----------|----------------|------------------|--------|-------------|--------|--------------|\n"
     
     for d in dates:
@@ -350,8 +355,8 @@ def main():
         bay = bayssellance_data.get(d_str, "N/A")
         if bay is None: bay = "Sense Info"
         
-        # Serradets
-        ser = serradets_data.get(d_str, "N/A")
+        # Sarradets
+        ser = sarradets_data.get(d_str, "N/A")
         if ser is None: ser = "Sense Info"
         
         # Grange
