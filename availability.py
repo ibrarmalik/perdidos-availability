@@ -37,22 +37,22 @@ def create_pdf(results, filename="availability.pdf"):
     pdf.set_font("helvetica", size=10)
     
     # Table Header
-    headers = ["Data", "Pineta", "Góriz (Refugi)", "Góriz (Acampada)", "Espuguettes", "Bayssellance"]
-    col_widths = [25, 25, 30, 30, 30, 30]
+    headers = ["Data", "Pineta", "Góriz (Ref)", "Góriz (Acam)", "Espuguettes", "Bayssellance", "Serradets"]
+    col_widths = [25, 20, 25, 25, 25, 25, 25]
     
     pdf.set_fill_color(200, 220, 255)
-    pdf.set_font("helvetica", 'B', 10)
+    pdf.set_font("helvetica", 'B', 8) # Smaller font for headers
     
     for i, header in enumerate(headers):
         pdf.cell(col_widths[i], 10, header, border=1, fill=True, align='C')
     pdf.ln()
     
     # Table Rows
-    pdf.set_font("helvetica", size=10)
+    pdf.set_font("helvetica", size=8) # Smaller font for content
     pdf.set_fill_color(255, 255, 255)
     
     for row in results:
-        # row structure from main: [d_str, pineta, goriz_ref, goriz_camp, esp, bay]
+        # row structure from main: [d_str, pineta, goriz_ref, goriz_camp, esp, bay, ser]
         for i, item in enumerate(row):
             text = str(item)
             pdf.cell(col_widths[i], 10, text, border=1, align='C')
@@ -190,6 +190,44 @@ def get_bayssellance():
         print(f"Error fetching Bayssellance: {e}")
         return {}
 
+def get_serradets():
+    print("Fetching Serradets (Brèche de Roland)...")
+    url = 'https://centrale.ffcam.fr/index.php?'
+    
+    headers = HEADERS.copy()
+    headers.update({
+        'origin': 'https://centrale.ffcam.fr',
+        'referer': 'https://centrale.ffcam.fr/index.php?structure=112&mode=FORM&_lang=FR',
+        'content-type': 'application/x-www-form-urlencoded'
+    })
+    
+    data_payload = {
+        'action': 'availability',
+        'structure': 'BK_STRUCTURE:112',
+        'productCategory': 'BK_PRODUCTCATEGORY:NUITEE',
+        'pax': '8'
+    }
+    
+    try:
+        resp = requests.post(url, headers=headers, data=data_payload)
+        text = resp.text
+        
+        match = re.search(r'BK\.availability\s*=\s*({.*?});', text, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+            try:
+                data = json.loads(json_str)
+                return data
+            except json.JSONDecodeError:
+                print("Serradets returned valid JS but invalid JSON")
+                return {}
+        else:
+            print("Could not find BK.availability in Serradets response")
+            return {}
+    except Exception as e:
+        print(f"Error fetching Serradets: {e}")
+        return {}
+
 def get_bujaruelo(target_date):
     # Bujaruelo API seems to return data for the requested range.
     d_str = target_date.strftime('%Y-%m-%d')
@@ -235,6 +273,7 @@ def main():
     goriz_data = get_goriz()
     # espuguettes_data = get_espuguettes() # We will fetch per day now
     bayssellance_data = get_bayssellance()
+    serradets_data = get_serradets()
     
     dates = list(get_date_range())
     
@@ -244,8 +283,8 @@ def main():
     print("\nProcessant dates...")
     
     output_md = "# Informe de Disponibilitat\n\n"
-    output_md += "| Data | Pineta | Góriz (Refugi) | Góriz (Acampada) | Espuguettes | Bayssellance |\n"
-    output_md += "|------|--------|----------------|------------------|-------------|--------------|\n"
+    output_md += "| Data | Pineta | Góriz (Refugi) | Góriz (Acampada) | Espuguettes | Bayssellance | Serradets |\n"
+    output_md += "|------|--------|----------------|------------------|-------------|--------------|-----------|\n"
     
     for d in dates:
         d_str = format_date(d)
@@ -266,10 +305,14 @@ def main():
         bay = bayssellance_data.get(d_str, "N/A")
         if bay is None: bay = "Sense Info"
         
-        # Collect for PDF
-        results.append([d_str, pineta, goriz_ref, goriz_camp, esp, bay])
+        # Serradets
+        ser = serradets_data.get(d_str, "N/A")
+        if ser is None: ser = "Sense Info"
         
-        row = f"| {d_str} | {pineta} | {goriz_ref} | {goriz_camp} | {esp} | {bay} |"
+        # Collect for PDF
+        results.append([d_str, pineta, goriz_ref, goriz_camp, esp, bay, ser])
+        
+        row = f"| {d_str} | {pineta} | {goriz_ref} | {goriz_camp} | {esp} | {bay} | {ser} |"
         output_md += row + "\n"
         print(f"Processat {d_str}")
 
